@@ -67,7 +67,7 @@ class CRM_LegacyExport_Generate {
 				in_array($dao->membership_type, array($membership_type_sp, $membership_type_sprood)) ? 1 : 0, // Is lid
 				$dao->street_name, // Straat
 				$dao->street_number, // Huisnummer
-				$dao->street_number_suffix, // Toevoeging
+				$dao->street_unit, // Toevoeging
 				$dao->city, // Plaats
 				$dao->phone, // Telefoon
 				$dao->mobile, // Mobiel

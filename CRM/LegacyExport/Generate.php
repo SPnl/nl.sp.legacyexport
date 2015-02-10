@@ -26,13 +26,12 @@ class CRM_LegacyExport_Generate {
 		$membership_type_rood = array_search('Lid ROOD', $membershipTypes);
 		$membership_type_sprood = array_search('Lid SP en ROOD', $membershipTypes);
 
-		$threeMonths = date('Y-m-d', time() + 86400 * 90);
 
 		// Contacten en lidmaatschappen
 
 		$sql = "SELECT DISTINCT c.id AS contact_id, c.first_name, c.middle_name, c.last_name, c.nick_name, c.gender_id, c.birth_date, ca.street_name, ca.street_number, ca.street_unit, ca.city, ca.postal_code, ca.country_id, cc.name AS country_name, cc.iso_code AS country_code, ca.state_province_id, ce.email, cp.phone, cpm.phone AS mobile, cca.id AS afdeling_id, cca.display_name AS afdeling, cva.gemeente_24 AS gemeente, ccr.id AS regio_id, ccr.display_name AS regio, ccp.id AS provincie_id, ccp.display_name AS provincie, c.do_not_mail, c.do_not_phone, cm.membership_type_id AS membership_type, cm.start_date AS sp_start_date, cm.end_date AS sp_end_date, cm.status_id, cm.source, cml.reden_6 AS opzegreden, cmw.cadeau_8 AS cadeau, cmw.datum_14 AS cadeaudatum
 	FROM civicrm_contact c
-	LEFT JOIN civicrm_membership cm ON (c.id = cm.contact_id AND cm.membership_type_id IN ({$membership_type_sp},{$membership_type_sprood},{$membership_type_rood}) AND (cm.status_id IN (1,2) OR (cm.end_date >= '" . date('Y-m-d') . "' AND cm.end_date <= '" . $threeMonths . "')))
+	LEFT JOIN civicrm_membership cm ON (c.id = cm.contact_id AND cm.membership_type_id IN ({$membership_type_sp},{$membership_type_sprood},{$membership_type_rood}) AND (cm.status_id IN (1,2) OR (cm.end_date >= '2015-01-01')))
 	LEFT JOIN civicrm_value_migratie_lidmaatschappen_2 cml ON cml.entity_id = cm.id
 	LEFT JOIN civicrm_value_welkomstcadeau_sp_3 cmw ON cmw.entity_id = cm.id
 	LEFT JOIN civicrm_address ca ON c.id = ca.contact_id AND ca.is_primary = 1
@@ -45,7 +44,7 @@ class CRM_LegacyExport_Generate {
 	LEFT JOIN civicrm_contact cca ON cvg.afdeling = cca.id
 	LEFT JOIN civicrm_contact ccr ON cvg.regio = ccr.id
 	LEFT JOIN civicrm_contact ccp ON cvg.provincie = ccp.id
-	WHERE cm.status_id IN (1,2) OR cm.end_date <= '" . $threeMonths . "'
+	WHERE cm.status_id IN (1,2) OR cm.end_date >= '2015-01-01'
 	GROUP BY c.id
 	";
 
@@ -119,7 +118,7 @@ class CRM_LegacyExport_Generate {
 		$sql = "SELECT DISTINCT cr.id, cr.contact_id_a, cr.contact_id_b, cr.start_date, cr.end_date, cr.is_active, crt.name_a_b AS relname, crt.label_a_b AS rellabel
 	FROM civicrm_relationship cr
 	LEFT JOIN civicrm_relationship_type crt ON cr.relationship_type_id = crt.id
-	WHERE crt.contact_type_a = 'Individual' AND cr.is_active = 1";
+	WHERE crt.contact_type_a = 'Individual' AND cr.is_active = 1 AND (cr.end_date IS NULL OR cr.end_date >= CURDATE())";
 		$dao = CRM_Core_DAO::executeQuery($sql);
 
 		$exportDoublePlusH = fopen($exportPath . "/exportdoubleplus_H.del", "w");

@@ -205,22 +205,22 @@ class CRM_LegacyExport_Generate {
 			case 'sprel_bestelpersoon_landelijk':
 				return 'FMB';
 				break;
-			case 'sprel_fractievoorzitter_fractie':
+			case 'sprel_fractievoorzitter_afdeling';
 				return 'FG';
 				break;
-			case 'sprel_fractievoorzitter_provincie':
+			case 'sprel_fractievoorzitter_provincie';
 				return 'FP';
 				break;
-			case 'sprel_fractievoorzitter_landelijk':
+			case 'sprel_fractievoorzitter_landelijk';
 				return 'F';
 				break;
-			case 'sprel_fractieraadslid_fractie':
+			case 'sprel_fractieraadslid_afdeling';
 				return 'YR';
 				break;
-			case 'sprel_deelraadslid_fractie':
+			case 'sprel_deelraadslid_afdeling';
 				return 'YD';
 				break;
-			case 'sprel_wethouder_fractie':
+			case 'sprel_wethouder_afdeling';
 				return 'WH';
 				break;
 			case 'sprel_statenlid_provincie':
@@ -270,6 +270,12 @@ class CRM_LegacyExport_Generate {
 				break;
 			case 'sprel_actiefroodlandelijk_landelijk':
 				return 'ROOD';
+				break;
+			case 'sprel_gebiedscomissielid_afd':
+				return 'GL';
+				break;
+			case 'sprel_gebiedscomissievoorzitter_afd':
+				return 'GV';
 				break;
 			default:
 				return 'UNK';

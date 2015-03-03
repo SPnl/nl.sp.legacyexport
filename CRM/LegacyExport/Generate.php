@@ -58,8 +58,8 @@ class CRM_LegacyExport_Generate {
 	LEFT JOIN civicrm_value_adresgegevens_12 cva ON ca.id = cva.entity_id
 	LEFT JOIN civicrm_country cc ON ca.country_id = cc.id
 	LEFT JOIN civicrm_email ce ON c.id = ce.contact_id AND ce.is_primary = 1
-	LEFT JOIN civicrm_phone cp ON c.id = cp.contact_id AND cp.phone_type_id = 1 AND cp.is_primary = 1
-	LEFT JOIN civicrm_phone cpm ON c.id = cpm.contact_id AND cpm.phone_type_id = 2 AND cpm.is_primary = 1
+	LEFT JOIN civicrm_phone cp ON c.id = cp.contact_id AND cp.phone_type_id = 1
+	LEFT JOIN civicrm_phone cpm ON c.id = cpm.contact_id AND cpm.phone_type_id = 2
 	LEFT JOIN civicrm_value_geostelsel cvg ON c.id = cvg.entity_id
 	LEFT JOIN civicrm_contact cca ON cvg.afdeling = cca.id
 	LEFT JOIN civicrm_contact ccr ON cvg.regio = ccr.id

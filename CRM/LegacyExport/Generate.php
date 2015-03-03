@@ -26,12 +26,32 @@ class CRM_LegacyExport_Generate {
 		$membership_type_rood = array_search('Lid ROOD', $membershipTypes);
 		$membership_type_sprood = array_search('Lid SP en ROOD', $membershipTypes);
 
+		$relationshipTypes = CRM_Core_PseudoConstant::relationshipType('name');
+		foreach($relationshipTypes as $rtype) {
+			switch($rtype['name_a_b']) {
+				case 'sprel_personeelslid_amersfoort_landelijk':
+					$relationship_type_am = $rtype['id'];
+					break;
+				case 'sprel_personeelslid_denhaag_landelijk':
+					$relationship_type_dh = $rtype['id'];
+					break;
+				case 'sprel_personeelslid_brussel_landelijk':
+					$relationship_type_br = $rtype['id'];
+					break;
+				case 'sprel_bestelpersoon_landelijk':
+					$relationship_type_bp = $rtype['id'];
+					break;
+			}
+		}
+
+		$endDate = date('Y-m-d', mktime(0, 0, 0, 1, 1, 2015));
 
 		// Contacten en lidmaatschappen
 
 		$sql = "SELECT DISTINCT c.id AS contact_id, c.first_name, c.middle_name, c.last_name, c.nick_name, c.gender_id, c.birth_date, ca.street_name, ca.street_number, ca.street_unit, ca.city, ca.postal_code, ca.country_id, cc.name AS country_name, cc.iso_code AS country_code, ca.state_province_id, ce.email, cp.phone, cpm.phone AS mobile, cca.id AS afdeling_id, cca.display_name AS afdeling, cva.gemeente_24 AS gemeente, ccr.id AS regio_id, ccr.display_name AS regio, ccp.id AS provincie_id, ccp.display_name AS provincie, c.do_not_mail, c.do_not_phone, cm.membership_type_id AS membership_type, cm.start_date AS sp_start_date, cm.end_date AS sp_end_date, cm.status_id, cm.source, cml.reden_6 AS opzegreden, cmw.cadeau_8 AS cadeau, cmw.datum_14 AS cadeaudatum
 	FROM civicrm_contact c
-	LEFT JOIN civicrm_membership cm ON (c.id = cm.contact_id AND cm.membership_type_id IN ({$membership_type_sp},{$membership_type_sprood},{$membership_type_rood}) AND (cm.status_id IN (1,2) OR (cm.end_date >= '2015-01-01')))
+	LEFT JOIN civicrm_membership cm ON (c.id = cm.contact_id AND cm.membership_type_id IN ({$membership_type_sp},{$membership_type_sprood},{$membership_type_rood}) AND (cm.status_id IN (1,2) OR (cm.end_date >= '{$endDate}')))
+	LEFT JOIN civicrm_relationship cr ON (c.id = cr.contact_id_a AND cr.relationship_type_id IN ({$relationship_type_am},{$relationship_type_dh},{$relationship_type_br},{$relationship_type_bp}) AND (cr.end_date IS NULL OR cr.end_date > '{$endDate}'))
 	LEFT JOIN civicrm_value_migratie_lidmaatschappen_2 cml ON cml.entity_id = cm.id
 	LEFT JOIN civicrm_value_welkomstcadeau_sp_3 cmw ON cmw.entity_id = cm.id
 	LEFT JOIN civicrm_address ca ON c.id = ca.contact_id AND ca.is_primary = 1
@@ -44,7 +64,7 @@ class CRM_LegacyExport_Generate {
 	LEFT JOIN civicrm_contact cca ON cvg.afdeling = cca.id
 	LEFT JOIN civicrm_contact ccr ON cvg.regio = ccr.id
 	LEFT JOIN civicrm_contact ccp ON cvg.provincie = ccp.id
-	WHERE cm.status_id IN (1,2) OR cm.end_date >= '2015-01-01'
+	WHERE cm.status_id IN (1,2) OR cm.end_date >= '{$endDate}' OR (cr.relationship_type_id IS NOT NULL AND (cr.end_date IS NULL OR cr.end_date >= '{$endDate}'))
 	GROUP BY c.id
 	";
 

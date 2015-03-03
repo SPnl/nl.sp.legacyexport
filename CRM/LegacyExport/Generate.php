@@ -225,22 +225,22 @@ class CRM_LegacyExport_Generate {
 			case 'sprel_bestelpersoon_landelijk':
 				return 'FMB';
 				break;
-			case 'sprel_fractievoorzitter_afdeling';
+			case 'sprel_fractievoorzitter_afdeling':
 				return 'FG';
 				break;
-			case 'sprel_fractievoorzitter_provincie';
+			case 'sprel_fractievoorzitter_provincie':
 				return 'FP';
 				break;
-			case 'sprel_fractievoorzitter_landelijk';
+			case 'sprel_fractievoorzitter_landelijk':
 				return 'F';
 				break;
-			case 'sprel_fractieraadslid_afdeling';
+			case 'sprel_fractieraadslid_afdeling':
 				return 'YR';
 				break;
-			case 'sprel_deelraadslid_afdeling';
+			case 'sprel_deelraadslid_afdeling':
 				return 'YD';
 				break;
-			case 'sprel_wethouder_afdeling';
+			case 'sprel_wethouder_afdeling':
 				return 'WH';
 				break;
 			case 'sprel_statenlid_provincie':

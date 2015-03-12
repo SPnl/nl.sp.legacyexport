@@ -64,7 +64,7 @@ class CRM_LegacyExport_Generate {
 	LEFT JOIN civicrm_contact cca ON cvg.afdeling = cca.id
 	LEFT JOIN civicrm_contact ccr ON cvg.regio = ccr.id
 	LEFT JOIN civicrm_contact ccp ON cvg.provincie = ccp.id
-	WHERE cm.status_id IN (1,2) OR cm.end_date >= '{$endDate}' OR (cr.relationship_type_id IS NOT NULL AND (cr.end_date IS NULL OR cr.end_date >= '{$endDate}'))
+	WHERE c.is_deleted = 0 AND (cm.status_id IN (1,2) OR cm.end_date >= '{$endDate}' OR (cr.relationship_type_id IS NOT NULL AND (cr.end_date IS NULL OR cr.end_date >= '{$endDate}')))
 	GROUP BY c.id
 	";
 

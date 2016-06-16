@@ -44,7 +44,7 @@ class CRM_LegacyExport_Generate {
 			}
 		}
 
-		$endDate = date('Y-m-d', mktime(0, 0, 0, 1, 1, 2015));
+		$endDate = date('Y-m-d', mktime(0, 0, 0, 1, 1, 2016));
 
 		// Contacten en lidmaatschappen
 

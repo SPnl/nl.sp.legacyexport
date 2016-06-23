@@ -13,170 +13,148 @@ class CRM_LegacyExport_Generate {
 	 * - kevel_H.del
 	 *
 	 * @param $exportPath Path to add the files to
-	 *
 	 * @return bool Success
+	 * @throws \Exception When an API error occurs
 	 */
 	public static function generate($exportPath) {
 
-		// Initialisatie
-		$genderCodes = CRM_Core_PseudoConstant::get('CRM_Contact_DAO_Contact', 'gender_id');
+		// Get contacts
+		$contacts = civicrm_api3('Contact', 'getspdata', [
+			'include_memberships'   => 1,
+			'include_relationships' => 1,
+			'include_spspecial'     => 1,
+			'options'               => ['limit' => 999999],
+		]);
 
-		$membershipTypes = CRM_Member_PseudoConstant::membershipType();
-		$membership_type_sp = array_search('Lid SP', $membershipTypes);
-		$membership_type_rood = array_search('Lid ROOD', $membershipTypes);
-		$membership_type_sprood = array_search('Lid SP en ROOD', $membershipTypes);
-
-		$relationshipTypes = CRM_Core_PseudoConstant::relationshipType('name');
-		foreach($relationshipTypes as $rtype) {
-			switch($rtype['name_a_b']) {
-				case 'sprel_personeelslid_amersfoort_landelijk':
-					$relationship_type_am = $rtype['id'];
-					break;
-				case 'sprel_personeelslid_denhaag_landelijk':
-					$relationship_type_dh = $rtype['id'];
-					break;
-				case 'sprel_personeelslid_brussel_landelijk':
-					$relationship_type_br = $rtype['id'];
-					break;
-				case 'sprel_bestelpersoon_landelijk':
-					$relationship_type_bp = $rtype['id'];
-					break;
-			}
+		if (!$contacts || $contacts['is_error']) {
+			throw new \Exception('An error occurred fetching Contacts.GetSPData: ' . $contacts['error_message'] . '.');
 		}
 
-		$endDate = date('Y-m-d', mktime(0, 0, 0, 1, 1, 2016));
-
-		// Contacten en lidmaatschappen
-
-		$sql = "SELECT DISTINCT c.id AS contact_id, c.first_name, c.middle_name, c.last_name, cmc.voorletters_1 AS voorletters, c.gender_id, c.birth_date, ca.street_name, ca.street_number, ca.street_unit, ca.city, ca.postal_code, ca.country_id, cc.name AS country_name, cc.iso_code AS country_code, ca.state_province_id, ce.email, cp.phone, cpm.phone AS mobile, cca.id AS afdeling_id, cca.display_name AS afdeling, cva.gemeente_24 AS gemeente, ccr.id AS regio_id, ccr.display_name AS regio, ccp.id AS provincie_id, ccp.display_name AS provincie, c.do_not_mail, c.do_not_phone, cm.membership_type_id AS membership_type, cm.start_date AS sp_start_date, cm.end_date AS sp_end_date, cm.status_id, cm.source, cml.reden_6 AS opzegreden, cmw.cadeau_8 AS cadeau, cmw.datum_14 AS cadeaudatum
-	FROM civicrm_contact c
-	LEFT JOIN civicrm_membership cm ON (c.id = cm.contact_id AND cm.membership_type_id IN ({$membership_type_sp},{$membership_type_sprood},{$membership_type_rood}) AND (cm.status_id IN (1,2) OR (cm.end_date >= '{$endDate}' AND cm.status_id IN (3,4,6,7))))
-	LEFT JOIN civicrm_relationship cr ON (c.id = cr.contact_id_a AND cr.relationship_type_id IN ({$relationship_type_am},{$relationship_type_dh},{$relationship_type_br},{$relationship_type_bp}) AND (cr.end_date IS NULL OR cr.end_date > '{$endDate}'))
-	LEFT JOIN civicrm_value_migratie_1 cmc ON cmc.entity_id = c.id
-	LEFT JOIN civicrm_value_migratie_lidmaatschappen_2 cml ON cml.entity_id = cm.id
-	LEFT JOIN civicrm_value_welkomstcadeau_sp_3 cmw ON cmw.entity_id = cm.id
-	LEFT JOIN civicrm_address ca ON c.id = ca.contact_id AND ca.is_primary = 1
-	LEFT JOIN civicrm_value_adresgegevens_12 cva ON ca.id = cva.entity_id
-	LEFT JOIN civicrm_country cc ON ca.country_id = cc.id
-	LEFT JOIN civicrm_email ce ON c.id = ce.contact_id AND ce.is_primary = 1
-	LEFT JOIN civicrm_phone cp ON c.id = cp.contact_id AND cp.phone_type_id = 1
-	LEFT JOIN civicrm_phone cpm ON c.id = cpm.contact_id AND cpm.phone_type_id = 2
-	LEFT JOIN civicrm_value_geostelsel cvg ON c.id = cvg.entity_id
-	LEFT JOIN civicrm_contact cca ON cvg.afdeling = cca.id
-	LEFT JOIN civicrm_contact ccr ON cvg.regio = ccr.id
-	LEFT JOIN civicrm_contact ccp ON cvg.provincie = ccp.id
-	WHERE c.is_deleted = 0 AND (cm.status_id IN (1,2) OR cm.end_date >= '{$endDate}' OR (cr.relationship_type_id IS NOT NULL AND (cr.end_date IS NULL OR cr.end_date >= '{$endDate}')))
-	GROUP BY c.id
-	";
-
+		// Open all files and walk contact array
 		$exportDoublePlusA = fopen($exportPath . "/exportdoubleplus_A.del", "w");
-		$kevelA            = fopen($exportPath . "/kevel_A.del", "w");
+		$kevelA = fopen($exportPath . "/kevel_A.del", "w");
+		$exportDoublePlusH = fopen($exportPath . "/exportdoubleplus_H.del", "w");
+		$kevelH = fopen($exportPath . "/kevel_H.del", "w");
 
-		$dao = CRM_Core_DAO::executeQuery($sql);
-		while ($dao->fetch()) {
+		foreach ($contacts['values'] as $contact) {
 
-			fputcsv($exportDoublePlusA, array(
-				$dao->contact_id, // Regnr
-				$dao->postal_code, // Postcode
-				$dao->voorletters, // Voorletters
-				$dao->first_name, // Voornaam
-				$dao->middle_name, // Tussenvoegsel
-				$dao->last_name, // Achternaam
-				$dao->afdeling_id, // Afdeling-id
-				$dao->email, // Email
-				in_array($dao->membership_type, array($membership_type_sp, $membership_type_sprood)) ? 1 : 0, // Is lid
-				$dao->street_name, // Straat
-				$dao->street_number, // Huisnummer
-				$dao->street_unit, // Toevoeging
-				$dao->city, // Plaats
-				$dao->phone, // Telefoon
-				$dao->mobile, // Mobiel
+			// Get current SP and ROOD membership from the contact array, if available
+			$lidm = [];
+			if (count($contact['memberships']) > 0) {
+				foreach ($contact['memberships'] as $membership) {
+					if (in_array($membership['type_name'], ['Lid SP', 'Lid SP en ROOD']) &&
+					    (!isset($lidm['sp']) || in_array($membership['status_name'], ['New', 'Current']))
+					) {
+						$lidm['sp'] = $membership;
+					}
+					if (in_array($membership['type_name'], ['Lid ROOD', 'Lid SP en ROOD']) &&
+					    (!isset($lidm['rood']) || in_array($membership['status_name'], ['New', 'Current']))
+					) {
+						$lidm['rood'] = $membership;
+					}
+				}
+			}
+
+			// Write basic data to exportdoubleplus_a.del
+			fputcsv($exportDoublePlusA, [
+				$contact['contact_id'], // Regnr
+				$contact['postal_code'], // Postcode
+				$contact['initials'], // Voorletters
+				$contact['first_name'], // Voornaam
+				$contact['middle_name'], // Tussenvoegsel
+				$contact['last_name'], // Achternaam
+				$contact['afdeling_code'], // Afdeling-id
+				$contact['email'], // Email
+				$contact['member_sp'], // Is lid
+				$contact['street_name'], // Straat
+				$contact['street_number'], // Huisnummer
+				$contact['street_unit'], // Toevoeging
+				$contact['city'], // Plaats
+				$contact['phone'], // Telefoon
+				$contact['mobile'], // Mobiel
 				- 1, // Aangever?
-			), ',', '"');
-			fputcsv($kevelA, array(
-				$dao->contact_id, // Regnr
-				$dao->voorletters, // Voorletters
-				$dao->first_name, // Voornaam
-				$dao->middle_name, // Tussenvoegsel
-				$dao->last_name, // Achternaam
-				$dao->street_name, // Straat
-				$dao->street_number, // Huisnummer
-				$dao->street_unit, // Toevoeging
-				$dao->postal_code, // Postcode
-				$dao->city, // Plaats
-				$dao->country_code, // Land
-				$dao->birth_date, // Geboortedatum
-				substr($genderCodes[$dao->gender_id],0,1), // Gender
-				$dao->do_not_mail ? 1 : 0, // 'Statuscode'
-				$dao->afdeling_id, // Afdnr
-				$dao->afdeling, // Afdnaam
-				$dao->gemeente, // Gemeente
-				self::mapProvince($dao->provincie), // Provincie
-				$dao->regio, // Regio
+			], ',', '"');
+
+			// Write Memoria data to kevel_a.del
+			fputcsv($kevelA, [
+				$contact['contact_id'], // Regnr
+				$contact['initials'], // Voorletters
+				$contact['first_name'], // Voornaam
+				$contact['middle_name'], // Tussenvoegsel
+				$contact['last_name'], // Achternaam
+				$contact['street_name'], // Straat
+				$contact['street_number'], // Huisnummer
+				$contact['street_unit'], // Toevoeging
+				$contact['postal_code'], // Postcode
+				$contact['city'], // Plaats
+				$contact['country_code'], // Land
+				$contact['birth_date'], // Geboortedatum
+				$contact['gender'], // Gender
+				$contact['do_not_mail'] ? 1 : 0, // 'Statuscode'
+				$contact['afdeling_code'], // Afdnr
+				$contact['afdeling'], // Afdnaam
+				$contact['gemeente'], // Gemeente
+				self::mapProvince($contact['provincie']), // Provincie
+				$contact['regio'], // Regio
 				'LID', // Was lidcode
-				$dao->sp_start_date, // Bdat
-				$dao->sp_end_date, // Edat
-				$dao->opzegreden, // Opzegreden
+				(isset($lidm['sp']) ? $lidm['sp']['start_date'] : ''), // Bdat
+				(isset($lidm['sp']) ? $lidm['sp']['end_date'] : ''), // Edat
+				(isset($lidm['sp']) && isset($lidm['sp']['opzegreden']) ? $lidm['sp']['opzegreden'] : ''), // Opzegreden
 				'', // Was rekeningnummer, werd niet gebruikt
 				9, // Tribune -> nu onbekend
-				$dao->cadeau, // Welkomstcadeau
-				$dao->cadeaudatum, // Datum cadeau verzonden
-				9999, // Herkomstsegmentnummer -> nu onbekend
-				$dao->source, // Herkomstomschrijving (nieuw)
-				in_array($dao->membership_type, array($membership_type_sp, $membership_type_sprood)) ? 'T' : 'F', // Lid SP
-				in_array($dao->membership_type, array($membership_type_rood, $membership_type_sprood)) ? 'T' : 'F', // Lid ROOD
-				$dao->phone, // Telefoon
-				$dao->mobile, // Mobiel
-				$dao->email, // Email
-			), ',', '"');
+				(isset($lidm['sp']) && isset($lidm['sp']['cadeau']) ? $lidm['sp']['cadeau'] : ''), // Welkomstcadeau
+				(isset($lidm['sp']) && isset($lidm['sp']['cadeau_datum']) ? $lidm['sp']['cadeau_datum'] : ''), // Datum cadeau verzonden
+				(int) $contact['source'], // Herkomstsegmentnummer -> nu onbekend
+				$contact['source'], // Herkomstomschrijving (nieuw)
+				$contact['member_sp'],
+				$contact['member_rood'],
+				$contact['phone'],
+				$contact['mobile'],
+				$contact['email'],
+			], ',', '"');
+
+			// Write relationships data
+			if (count($contact['relationships']) > 0) {
+				foreach ($contact['relationships'] as $rel) {
+					$funcAbbrev = self::mapFuncAbbrev($rel['name_a_b']);
+
+					// ...to exportdoubleplus_h.del
+					fputcsv($exportDoublePlusH, [
+						$rel['contact_id_a'], // Regnr
+						$rel['start_date'], // Bdat
+						$funcAbbrev, // Afkorting
+					], ',', '"');
+
+					// ...to kevel_h.del
+					fputcsv($kevelH, [
+						$rel['contact_id_a'],
+						$rel['start_date'],
+						$rel['end_date'],
+						$funcAbbrev,
+						$rel['label_a_b'],
+					], ',', '"');
+				}
+			}
+
 		}
 
 		fclose($exportDoublePlusA);
 		fclose($kevelA);
-
-		// Functietabel
-
-		$sql = "SELECT DISTINCT cr.id, cr.contact_id_a, cr.contact_id_b, cr.start_date, cr.end_date, cr.is_active, crt.name_a_b AS relname, crt.label_a_b AS rellabel
-	FROM civicrm_relationship cr
-	LEFT JOIN civicrm_relationship_type crt ON cr.relationship_type_id = crt.id
-	WHERE crt.contact_type_a = 'Individual' AND cr.is_active = 1 AND (cr.end_date IS NULL OR cr.end_date >= CURDATE())";
-		$dao = CRM_Core_DAO::executeQuery($sql);
-
-		$exportDoublePlusH = fopen($exportPath . "/exportdoubleplus_H.del", "w");
-		$kevelH            = fopen($exportPath . "/kevel_H.del", "w");
-
-		while ($dao->fetch()) {
-
-			$funcAbbrev = self::mapFuncAbbrev($dao->relname);
-
-			fputcsv($exportDoublePlusH, array(
-				$dao->contact_id_a, // Regnr
-				$dao->start_date, // Bdat
-				$funcAbbrev, // Afkorting
-			), ',', '"');
-			fputcsv($kevelH, array(
-				$dao->contact_id_a, // Regnr
-				$dao->start_date, // Bdat
-				$dao->end_date, // Edat
-				$funcAbbrev, // Afkorting
-				$dao->rellabel, // Funcnaam
-			), ',', '"');
-		}
-
 		fclose($exportDoublePlusH);
 		fclose($kevelH);
 
-		/* Let op, sowieso geschrapt: kevel_R (ROOD-leden apart), kevel_S (herkomstnummers),
-		kevel_F en exportdoubleplus_F (functielijst) en exportdoubleplus_L (landcodes). */
+		/*
+		 * Let op, er zijn dus nog vier bestanden over (exportdoubleplus_A|H en kevel_A|H).
+		 * Geschrapt zijn: kevel_R (ROOD-leden apart), kevel_S (herkomstnummers),
+		 * kevel_F en exportdoubleplus_F (functielijst) en exportdoubleplus_L (landcodes).
+		 */
 
-		return true;
+		return TRUE;
 	}
 
 	/**
 	 * Maps CiviCRM relationship name to legacy function code
-	 *
 	 * @param string $relname Relationship name
-	 *
 	 * @return string Function code
 	 */
 	private static function mapFuncAbbrev($relname) {
@@ -307,41 +285,64 @@ class CRM_LegacyExport_Generate {
 
 	/**
 	 * Maps CiviCRM province contact name to province code
-	 *
 	 * @param string $provname Province name
-	 *
 	 * @return string Province code
 	 */
 	private static function mapProvince($provname) {
 
-		if (stripos($provname, 'Drenthe') !== false) {
+		if (stripos($provname, 'Drenthe') !== FALSE) {
 			return 'DR';
-		} elseif (stripos($provname, 'Zuid-Holland') !== false) {
+		} elseif (stripos($provname, 'Zuid-Holland') !== FALSE) {
 			return 'ZH';
-		} elseif (stripos($provname, 'Noord-Holland') !== false) {
+		} elseif (stripos($provname, 'Noord-Holland') !== FALSE) {
 			return 'NH';
-		} elseif (stripos($provname, 'Overijssel') !== false) {
+		} elseif (stripos($provname, 'Overijssel') !== FALSE) {
 			return 'OV';
-		} elseif (stripos($provname, 'Flevoland') !== false) {
+		} elseif (stripos($provname, 'Flevoland') !== FALSE) {
 			return 'FL';
-		} elseif (stripos($provname, 'Utrecht') !== false) {
+		} elseif (stripos($provname, 'Utrecht') !== FALSE) {
 			return 'UT';
-		} elseif (stripos($provname, 'Gelderland') !== false) {
+		} elseif (stripos($provname, 'Gelderland') !== FALSE) {
 			return 'GD';
-		} elseif (stripos($provname, 'Groningen') !== false) {
+		} elseif (stripos($provname, 'Groningen') !== FALSE) {
 			return 'GR';
-		} elseif (stripos($provname, 'Noord-Brabant') !== false) {
+		} elseif (stripos($provname, 'Noord-Brabant') !== FALSE) {
 			return 'NB';
-		} elseif (stripos($provname, 'Limburg') !== false) {
+		} elseif (stripos($provname, 'Limburg') !== FALSE) {
 			return 'LB';
-		} elseif (stripos($provname, 'Friesland') !== false) {
+		} elseif (stripos($provname, 'Friesland') !== FALSE) {
 			return 'FR';
-		} elseif (stripos($provname, 'Zeeland') !== false) {
+		} elseif (stripos($provname, 'Zeeland') !== FALSE) {
 			return 'ZL';
 		} else {
 			return '';
 		}
 
 	}
+
+	/* This is the original query this module previously used. Check if we get the same result (count):
+
+		$sql = "SELECT DISTINCT c.id AS contact_id, c.first_name, c.middle_name, c.last_name, cmc.voorletters_1 AS voorletters, c.gender_id, c.birth_date, ca.street_name, ca.street_number, ca.street_unit, ca.city, ca.postal_code, ca.country_id, cc.name AS country_name, cc.iso_code AS country_code, ca.state_province_id, ce.email, cp.phone, cpm.phone AS mobile, cca.id AS afdeling_id, cca.display_name AS afdeling, cva.gemeente_24 AS gemeente, ccr.id AS regio_id, ccr.display_name AS regio, ccp.id AS provincie_id, ccp.display_name AS provincie, c.do_not_mail, c.do_not_phone, cm.membership_type_id AS membership_type, cm.start_date AS sp_start_date, cm.end_date AS sp_end_date, cm.status_id, cm.source, cml.reden_6 AS opzegreden, cmw.cadeau_8 AS cadeau, cmw.datum_14 AS cadeaudatum
+	FROM civicrm_contact c
+	LEFT JOIN civicrm_membership cm ON (c.id = cm.contact_id AND cm.membership_type_id IN ({$membership_type_sp},{$membership_type_sprood},{$membership_type_rood}) AND (cm.status_id IN (1,2) OR (cm.end_date >= '{$endDate}' AND cm.status_id IN (3,4,6,7))))
+	LEFT JOIN civicrm_relationship cr ON (c.id = cr.contact_id_a AND cr.relationship_type_id IN ({$relationship_type_am},{$relationship_type_dh},{$relationship_type_br},{$relationship_type_bp}) AND (cr.end_date IS NULL OR cr.end_date > '{$endDate}'))
+	LEFT JOIN civicrm_value_migratie_1 cmc ON cmc.entity_id = c.id
+	LEFT JOIN civicrm_value_migratie_lidmaatschappen_2 cml ON cml.entity_id = cm.id
+	LEFT JOIN civicrm_value_welkomstcadeau_sp_3 cmw ON cmw.entity_id = cm.id
+	LEFT JOIN civicrm_address ca ON c.id = ca.contact_id AND ca.is_primary = 1
+	LEFT JOIN civicrm_value_adresgegevens_12 cva ON ca.id = cva.entity_id
+	LEFT JOIN civicrm_country cc ON ca.country_id = cc.id
+	LEFT JOIN civicrm_email ce ON c.id = ce.contact_id AND ce.is_primary = 1
+	LEFT JOIN civicrm_phone cp ON c.id = cp.contact_id AND cp.phone_type_id = 1
+	LEFT JOIN civicrm_phone cpm ON c.id = cpm.contact_id AND cpm.phone_type_id = 2
+	LEFT JOIN civicrm_value_geostelsel cvg ON c.id = cvg.entity_id
+	LEFT JOIN civicrm_contact cca ON cvg.afdeling = cca.id
+	LEFT JOIN civicrm_contact ccr ON cvg.regio = ccr.id
+	LEFT JOIN civicrm_contact ccp ON cvg.provincie = ccp.id
+	WHERE c.is_deleted = 0 AND (cm.status_id IN (1,2) OR cm.end_date >= '{$endDate}' OR (cr.relationship_type_id IS NOT NULL AND (cr.end_date IS NULL OR cr.end_date >= '{$endDate}')))
+	GROUP BY c.id
+	";
+	 * 
+	 */
 
 }
